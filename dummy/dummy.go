@@ -28,6 +28,7 @@ func (p *dummyServiceProxy) VoidMethod(msg string) {
 	slog.Info("dummy proxy void")
 	p.ExecuteAsync(service.Job{
 		Execute: func() {
+			slog.Info("job Execute", "job", "VoidMethod")
 			p.impl.VoidMethod(msg)
 		},
 		Name: "VoidMethod",
@@ -36,19 +37,32 @@ func (p *dummyServiceProxy) VoidMethod(msg string) {
 
 func (p *dummyServiceProxy) NonVoidMethod(msg string) string {
 	slog.Info("dummy proxy non-void")
-	resChan := make(chan string)
-
-	defer close(resChan)
-	p.ExecuteAsync(service.Job{
-		Execute: func() {
-			result := p.impl.NonVoidMethod(msg)
-			resChan <- result
-		},
-		Name: "NonVoidMethod",
+	job := service.NewSyncJob("NonVoidMethod", func() any {
+		return p.impl.NonVoidMethod(msg)
 	})
-	stored := <-resChan
-	return stored
+	result := p.ExecuteSync(*job)
+	stringResult, ok := result.(string)
+	if ok {
+		return stringResult
+	}
+	return ""
 }
+
+// func (p *dummyServiceProxy) NonVoidMethod(msg string) string {
+// 	slog.Info("dummy proxy non-void")
+// 	resChan := make(chan string)
+//
+// 	defer close(resChan)
+// 	p.ExecuteAsync(service.Job{
+// 		Execute: func() {
+// 			result := p.impl.NonVoidMethod(msg)
+// 			resChan <- result
+// 		},
+// 		Name: "NonVoidMethod",
+// 	})
+// 	stored := <-resChan
+// 	return stored
+// }
 
 func (p *dummyServiceProxy) RegisterUserListener(listener userapi.IUserListener) {
 	slog.Info("dummy proxy register listener")

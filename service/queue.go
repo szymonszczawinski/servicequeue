@@ -8,8 +8,43 @@ import (
 )
 
 type Job struct {
-	Execute func()
-	Name    string
+	Execute       func()
+	ExecuteSync   func() any
+	ResultChannel chan any
+	Name          string
+}
+
+func NewJob(name string, executable func()) *Job {
+	return &Job{
+		Name:    name,
+		Execute: executable,
+	}
+}
+
+func NewSyncJob(name string, executable func() any) *Job {
+	return &Job{
+		Name:          name,
+		ExecuteSync:   executable,
+		ResultChannel: make(chan any),
+	}
+}
+
+func (j *Job) Run() {
+	slog.Info("job run", "job", j.Name)
+	if j.ExecuteSync != nil {
+		res := j.ExecuteSync()
+		j.ResultChannel <- res
+	} else {
+		j.Execute()
+	}
+}
+
+func (j *Job) End() {
+	close(j.ResultChannel)
+}
+
+func (sj Job) Get() any {
+	return <-sj.ResultChannel
 }
 
 type IJobQueue interface {
@@ -30,6 +65,12 @@ func NewJobProxy(queue IJobQueue) JobProxy {
 
 func (jp *JobProxy) ExecuteAsync(job Job) {
 	jp.queue.Add(job)
+}
+
+func (jp *JobProxy) ExecuteSync(job Job) any {
+	defer job.End()
+	jp.queue.Add(job)
+	return job.Get()
 }
 
 type jobQueue struct {
@@ -65,7 +106,7 @@ func (jq *jobQueue) Start(ctx context.Context) {
 
 				slog.Info("job queue execute job", "queue", jq.name, "job", job.Name)
 				// jq.g.Go(func() error {
-				job.Execute()
+				job.Run()
 				// return nil
 				// })
 			}
