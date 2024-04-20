@@ -64,10 +64,10 @@ func (jq *jobQueue) Start(ctx context.Context) {
 			case job := <-jq.jobs:
 
 				slog.Info("job queue execute job", "queue", jq.name, "job", job.Name)
-				jq.g.Go(func() error {
-					job.Execute()
-					return nil
-				})
+				// jq.g.Go(func() error {
+				job.Execute()
+				// return nil
+				// })
 			}
 
 		}

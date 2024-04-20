@@ -27,6 +27,7 @@ func (p *userServiceProxy) VoidMethod() {
 		Execute: func() {
 			p.impl.VoidMethod()
 		},
+		Name: "user void",
 	})
 }
 
@@ -79,5 +80,6 @@ func (p *userListenerProxy) OnUser(user string) {
 		Execute: func() {
 			p.impl.OnUser(user)
 		},
+		Name: "OnUser",
 	})
 }
