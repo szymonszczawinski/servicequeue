@@ -4,23 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"servicequeue/dummyapi"
 	"servicequeue/service"
+	"servicequeue/userapi"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
 
-type IDummyService interface {
-	service.IProxy
-	VoidMethod(msg string)
-	NonVoidMethod(msg string) string
-}
-
 type dummyServiceProxy struct {
 	service.JobProxy
-	impl IDummyService
+	impl dummyapi.IDummyService
 }
 
-func NewDummyServiceProxy(impl IDummyService, queue service.IJobQueue) IDummyService {
+func NewDummyServiceProxy(impl dummyapi.IDummyService, queue service.IJobQueue) dummyapi.IDummyService {
 	return &dummyServiceProxy{
 		impl:     impl,
 		JobProxy: service.NewJobProxy(queue),
@@ -28,23 +25,39 @@ func NewDummyServiceProxy(impl IDummyService, queue service.IJobQueue) IDummySer
 }
 
 func (p *dummyServiceProxy) VoidMethod(msg string) {
+	slog.Info("dummy proxy void")
 	p.ExecuteAsync(service.Job{
 		Execute: func() {
 			p.impl.VoidMethod(msg)
 		},
+		Name: "VoidMethod",
 	})
 }
 
 func (p *dummyServiceProxy) NonVoidMethod(msg string) string {
+	slog.Info("dummy proxy non-void")
 	resChan := make(chan string)
 
 	defer close(resChan)
-	p.ExecuteAsync(service.Job{Execute: func() {
-		result := p.impl.NonVoidMethod(msg)
-		resChan <- result
-	}})
+	p.ExecuteAsync(service.Job{
+		Execute: func() {
+			result := p.impl.NonVoidMethod(msg)
+			resChan <- result
+		},
+		Name: "NonVoidMethod",
+	})
 	stored := <-resChan
 	return stored
+}
+
+func (p *dummyServiceProxy) RegisterUserListener(listener userapi.IUserListener) {
+	slog.Info("dummy proxy register listener")
+	p.ExecuteAsync(service.Job{
+		Execute: func() {
+			p.impl.RegisterUserListener(listener)
+		},
+		Name: "RegisterListener",
+	})
 }
 
 type dummyService struct {
@@ -64,10 +77,16 @@ func (s *dummyService) Start() {
 }
 
 func (s *dummyService) VoidMethod(msg string) {
+	time.Sleep(time.Second * 3)
 	slog.Info("void method", "msg", msg)
 }
 
 func (s *dummyService) NonVoidMethod(msg string) string {
 	slog.Info("non void method", "msg", msg)
 	return fmt.Sprintf("Hello %v", msg)
+}
+
+func (p *dummyService) RegisterUserListener(listener userapi.IUserListener) {
+	slog.Info("register listener")
+	listener.OnUser("John Doe")
 }

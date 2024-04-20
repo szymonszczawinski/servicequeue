@@ -6,8 +6,12 @@ import (
 	"os"
 	"os/signal"
 	"servicequeue/dummy"
+	"servicequeue/dummyapi"
 	"servicequeue/service"
+	"servicequeue/user"
+	"servicequeue/userapi"
 	"syscall"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -16,17 +20,24 @@ func main() {
 	baseContext, cancel := context.WithCancel(context.Background())
 	signalChannel := registerShutdownHook(cancel)
 	mainGroup, groupContext := errgroup.WithContext(baseContext)
-	d := dummy.NewDummyService(mainGroup, groupContext)
+	newd := dummy.NewDummyService(mainGroup, groupContext)
+	newd.Start()
 
-	d.Start()
-
+	newu := user.NewUserService(mainGroup, groupContext)
+	newu.Start()
 	serviceProvider := service.GetServiceProvider()
-	s := serviceProvider.GetService("dummy")
-	dummyService, ok := s.(dummy.IDummyService)
+	d := serviceProvider.GetService("dummy")
+	dummyService, ok := d.(dummyapi.IDummyService)
 	if ok {
 		dummyService.VoidMethod("Hello")
+		time.Sleep(time.Second * 2)
 		result := dummyService.NonVoidMethod("World")
 		slog.Info("result", "msg", result)
+	}
+	u := serviceProvider.GetService("user")
+	userService, ok := u.(userapi.IUserService)
+	if ok {
+		userService.VoidMethod()
 	}
 
 	if err := mainGroup.Wait(); err == nil {
